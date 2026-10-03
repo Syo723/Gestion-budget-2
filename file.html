@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="fr">
 <head>
  <meta charset="UTF-8">
@@ -957,6 +958,7 @@
  }
  }
  </style>
+ 
 </head>
 
 <body>
@@ -1963,8 +1965,11 @@
  }
 
  function setLoading(value) {
- document .getElementById("loadingScreen")
- .classList.toggle("hidden", !value);
+   const loadingScreen = document.getElementById("loadingScreen");
+
+   if (loadingScreen) {
+      loadingScreen.classList.toggle("hidden", !value);
+   }
  }
 
  function setSyncStatus(text) {
@@ -2197,6 +2202,7 @@
  */
 
  async function initializeApplication() {
+
  populateBudgetDaySelect();
 
  if (!isConfigured()) {
@@ -2212,6 +2218,15 @@
  .classList.add("hidden");
 
  return;
+ }
+
+  if (
+    !window.supabase ||
+     typeof window.supabase.createClient !== "function"
+ ) {
+   throw new Error(
+     "La bibliothèque Supabase n’a pas pu être chargée. Vérifie ta connexion Internet et la balise Supabase dans le fichier HTML."
+   );
  }
 
  supabaseClient = window.supabase.createClient(
@@ -4478,7 +4493,367 @@
  });
  });
 
- document .querySelectorAll("[data-open-page]")
- .forEach(button => {
- button.addEventListener("click", () => {
- navigateTo(button.dataset.openPage);
+document
+  .querySelectorAll("[data-open-page]")
+  .forEach(button => {
+    button.addEventListener("click", () => {
+      navigateTo(button.dataset.openPage);
+    });
+  });
+
+configureSegment("transactionTypeSegment", value => {
+  transactionType = value;
+
+  updateCategorySelect(
+    "transactionCategory",
+    transactionType
+  );
+});
+
+configureSegment("recurringTypeSegment", value => {
+  recurringType = value;
+
+  updateCategorySelect(
+    "recurringCategory",
+    recurringType
+  );
+});
+
+configureSegment("categoryTypeSegment", value => {
+  categoryType = value;
+});
+
+const transactionForm =
+  document.getElementById("transactionForm");
+
+if (transactionForm) {
+  transactionForm.addEventListener(
+    "submit",
+    addTransaction
+  );
+}
+
+const recurringForm =
+  document.getElementById("recurringForm");
+
+if (recurringForm) {
+  recurringForm.addEventListener(
+    "submit",
+    addRecurringPayment
+  );
+}
+
+const categoryForm =
+  document.getElementById("categoryForm");
+
+if (categoryForm) {
+  categoryForm.addEventListener(
+    "submit",
+    addCategory
+  );
+}
+
+const transactionTypeFilter =
+  document.getElementById("transactionTypeFilter");
+
+if (transactionTypeFilter) {
+  transactionTypeFilter.addEventListener(
+    "change",
+    renderTransactions
+  );
+}
+
+const transactionMonthFilter =
+  document.getElementById("transactionMonthFilter");
+
+if (transactionMonthFilter) {
+  transactionMonthFilter.addEventListener(
+    "change",
+    renderTransactions
+  );
+}
+
+const statisticsYearSelect =
+  document.getElementById("statisticsYear");
+
+if (statisticsYearSelect) {
+  statisticsYearSelect.addEventListener(
+    "change",
+    event => {
+      statisticsYear = Number(event.target.value);
+      renderStatistics();
+    }
+  );
+}
+
+/*
+ * Enregistrement du premier jour du mois budgétaire.
+ * Ce bloc ne provoquera pas d’erreur si le réglage
+ * n’a pas encore été ajouté dans ton HTML.
+ */
+const budgetMonthStartDaySelect =
+  document.getElementById("budgetMonthStartDay");
+
+if (
+  budgetMonthStartDaySelect &&
+  typeof saveBudgetMonthStartDay === "function"
+) {
+  budgetMonthStartDaySelect.addEventListener(
+    "change",
+    event => {
+      saveBudgetMonthStartDay(event.target.value);
+    }
+  );
+}
+
+/*
+ * Suppression des transactions,
+ * paiements récurrents et catégories.
+ */
+document.addEventListener("click", event => {
+  const transactionButton =
+    event.target.closest("[data-delete-transaction]");
+
+  if (transactionButton) {
+    deleteTransaction(
+      transactionButton.dataset.deleteTransaction
+    );
+
+    return;
+  }
+
+  const recurringButton =
+    event.target.closest("[data-delete-recurring]");
+
+  if (recurringButton) {
+    deleteRecurringPayment(
+      recurringButton.dataset.deleteRecurring
+    );
+
+    return;
+  }
+
+  const categoryButton =
+    event.target.closest("[data-delete-category]");
+
+  if (categoryButton) {
+    deleteCategory(
+      categoryButton.dataset.deleteCategory
+    );
+  }
+});
+
+/*
+ * Activation et désactivation des paiements récurrents.
+ */
+document.addEventListener("change", event => {
+  const toggle =
+    event.target.closest("[data-toggle-recurring]");
+
+  if (toggle) {
+    toggleRecurringPayment(
+      toggle.dataset.toggleRecurring,
+      toggle.checked
+    );
+  }
+});
+
+/*
+ * Actualisation lorsque l’application redevient visible.
+ */
+document.addEventListener("visibilitychange", () => {
+  if (
+    document.visibilityState === "visible" &&
+    currentUser
+  ) {
+    loadAllData(true);
+  }
+});
+
+/*
+ * Actualisation lorsque la connexion Internet revient.
+ */
+window.addEventListener("online", () => {
+  if (currentUser) {
+    loadAllData(true);
+  }
+});
+
+/*
+ * Actualisation des graphiques lors d’un changement
+ * entre le mode clair et le mode sombre.
+ */
+const darkModeMediaQuery = window.matchMedia(
+  "(prefers-color-scheme: dark)"
+);
+
+function refreshChartTheme() {
+  if (
+    typeof currentPage !== "undefined" &&
+    currentPage === "statistics" &&
+    typeof renderStatistics === "function"
+  ) {
+    renderStatistics();
+  }
+}
+
+if (darkModeMediaQuery.addEventListener) {
+  darkModeMediaQuery.addEventListener(
+    "change",
+    refreshChartTheme
+  );
+} else if (darkModeMediaQuery.addListener) {
+  darkModeMediaQuery.addListener(refreshChartTheme);
+}
+
+/*
+ * ============================================================
+ * INITIALISATION DES CHAMPS
+ * ============================================================
+ */
+
+const today = new Date();
+
+const transactionDateInput =
+  document.getElementById("transactionDate");
+
+if (transactionDateInput) {
+  transactionDateInput.value = toISODate(today);
+}
+
+const recurringStartDateInput =
+  document.getElementById("recurringStartDate");
+
+if (recurringStartDateInput) {
+  recurringStartDateInput.value = toISODate(today);
+}
+
+if (transactionMonthFilter) {
+  /*
+   * Utilise la période budgétaire personnalisée si la
+   * fonction existe. Sinon, utilise le mois civil.
+   */
+  transactionMonthFilter.value =
+    typeof getBudgetPeriod === "function"
+      ? getBudgetPeriod(today).key
+      : toISODate(today).slice(0, 7);
+}
+
+/*
+ * ============================================================
+ * DÉMARRAGE SÉCURISÉ
+ * ============================================================
+ */
+
+/*
+ * Si Supabase ou une requête reste bloqué, un message
+ * sera affiché après 12 secondes au lieu de conserver
+ * indéfiniment l’écran de chargement.
+ */
+const startupSafetyTimer = window.setTimeout(() => {
+  const loadingScreen =
+    document.getElementById("loadingScreen");
+
+  if (
+    loadingScreen &&
+    !loadingScreen.classList.contains("hidden")
+  ) {
+    setLoading(false);
+
+    const authScreen =
+      document.getElementById("authScreen");
+
+    const authCard =
+      document.getElementById("authCard");
+
+    const configurationWarning =
+      document.getElementById(
+        "configurationWarning"
+      );
+
+    if (authScreen) {
+      authScreen.classList.remove("hidden");
+    }
+
+    if (authCard) {
+      authCard.classList.remove("hidden");
+    }
+
+    if (configurationWarning) {
+      configurationWarning.classList.remove("hidden");
+
+      configurationWarning.innerHTML = `
+        <strong>Le chargement prend trop de temps.</strong>
+        <br><br>
+        Vérifie l’adresse Supabase, la clé publique,
+        la connexion Internet et la configuration des
+        URL dans Supabase.
+        <br><br>
+        Recharge ensuite la page.
+      `;
+    }
+  }
+}, 12000);
+
+/*
+ * Lancement réel de l’application.
+ */
+initializeApplication()
+  .then(() => {
+    window.clearTimeout(startupSafetyTimer);
+  })
+  .catch(error => {
+    window.clearTimeout(startupSafetyTimer);
+
+    console.error(
+      "Erreur au démarrage de l’application :",
+      error
+    );
+
+    setLoading(false);
+
+    const authScreen =
+      document.getElementById("authScreen");
+
+    const authCard =
+      document.getElementById("authCard");
+
+    const configurationWarning =
+      document.getElementById(
+        "configurationWarning"
+      );
+
+    if (authScreen) {
+      authScreen.classList.remove("hidden");
+    }
+
+    if (authCard) {
+      authCard.classList.remove("hidden");
+    }
+
+    if (configurationWarning) {
+      const rawMessage =
+        typeof normalizeError === "function"
+          ? normalizeError(error)
+          : error?.message || String(error);
+
+      const safeMessage =
+        typeof escapeHTML === "function"
+          ? escapeHTML(rawMessage)
+          : rawMessage;
+
+      configurationWarning.classList.remove("hidden");
+
+      configurationWarning.innerHTML = `
+        <strong>Impossible de démarrer l’application.</strong>
+        <br><br>
+        ${safeMessage}
+        <br><br>
+        Vérifie la configuration Supabase puis recharge la page.
+      `;
+    }
+  });
+</script>
+</body>
+</html>
+
