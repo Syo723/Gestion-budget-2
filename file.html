@@ -1859,11 +1859,11 @@
      */
 
     function isConfigured() {
-      return (
-        SUPABASE_URL("https://qahomewgaxqpiyyzjaic.supabase.co") &&
-        SUPABASE_PUBLIC_KEY("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhaG9tZXdnYXhxcGl5eXpqYWljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzg4NzMsImV4cCI6MjEwNjYxNDg3M30.pvXQqwpvQ9WnNNhTk5g_duKc606anml-PdIy03KZPow") &&
-        !SUPABASE_URL.includes("https://qahomewgaxqpiyyzjaic.supabase.co") &&
-        !SUPABASE_PUBLIC_KEY.includes("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhaG9tZXdnYXhxcGl5eXpqYWljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzg4NzMsImV4cCI6MjEwNjYxNDg3M30.pvXQqwpvQ9WnNNhTk5g_duKc606anml-PdIy03KZPow")
+      return Boolean(
+        SUPABASE_URL &&
+        SUPABASE_PUBLIC_KEY &&
+        !SUPABASE_URL.startsWith("https://") &&
+        !SUPABASE_PUBLIC_KEY.length >20
       );
     }
 
