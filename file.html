@@ -1572,6 +1572,74 @@
       <!-- Catégories -->
       <section class="page" id="categoriesPage">
         <div class="card form-card">
+  <h2 class="section-title">Période budgétaire</h2>
+
+  <p
+    style="
+      margin: 8px 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    "
+  >
+    Choisis le jour qui marque le début de chaque mois budgétaire.
+    Par exemple, avec le jour 25, la période ira du 25 du mois
+    courant au 24 du mois suivant.
+  </p>
+
+  <div class="field">
+    <label for="budgetMonthStartDay">
+      Premier jour du mois budgétaire
+    </label>
+
+    <select id="budgetMonthStartDay">
+      <option value="1">1er du mois</option>
+      <option value="2">2 du mois</option>
+      <option value="3">3 du mois</option>
+      <option value="4">4 du mois</option>
+      <option value="5">5 du mois</option>
+      <option value="6">6 du mois</option>
+      <option value="7">7 du mois</option>
+      <option value="8">8 du mois</option>
+      <option value="9">9 du mois</option>
+      <option value="10">10 du mois</option>
+      <option value="11">11 du mois</option>
+      <option value="12">12 du mois</option>
+      <option value="13">13 du mois</option>
+      <option value="14">14 du mois</option>
+      <option value="15">15 du mois</option>
+      <option value="16">16 du mois</option>
+      <option value="17">17 du mois</option>
+      <option value="18">18 du mois</option>
+      <option value="19">19 du mois</option>
+      <option value="20">20 du mois</option>
+      <option value="21">21 du mois</option>
+      <option value="22">22 du mois</option>
+      <option value="23">23 du mois</option>
+      <option value="24">24 du mois</option>
+      <option value="25">25 du mois</option>
+      <option value="26">26 du mois</option>
+      <option value="27">27 du mois</option>
+      <option value="28">28 du mois</option>
+    </select>
+  </div>
+
+  <div
+    id="budgetPeriodPreview"
+    style="
+      margin-top: 12px;
+      padding: 13px 14px;
+      border-radius: 14px;
+      color: var(--muted);
+      background: var(--primary-soft);
+      font-size: 13px;
+      line-height: 1.5;
+    "
+  ></div>
+</div>
+
+<div class="section"></div>
+        <div class="card form-card">
           <h2 class="section-title">Nouvelle catégorie</h2>
 
           <form id="categoryForm" class="section">
@@ -1721,6 +1789,8 @@
     let categoryType = "expense";
     let statisticsYear = new Date().getFullYear();
 
+    let budgetMonthStartDay = 1;
+
     let state = {
       categories: [],
       transactions: [],
@@ -1849,6 +1919,109 @@
         year: "numeric"
       }).format(parseDate(dateString));
     }
+
+    /*
+ * ============================================================
+ * PÉRIODES BUDGÉTAIRES
+ * ============================================================
+ */
+
+/*
+ * Retourne la période budgétaire à laquelle appartient une date.
+ *
+ * Exemple avec un premier jour réglé sur 25 :
+ * - le 24 mars appartient à la période commençant le 25 février ;
+ * - le 25 mars appartient à la période commençant le 25 mars.
+ */
+function getBudgetPeriod(date) {
+  const localDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    12,
+    0,
+    0
+  );
+
+  let periodYear = localDate.getFullYear();
+  let periodMonth = localDate.getMonth();
+
+  if (localDate.getDate() < budgetMonthStartDay) {
+    periodMonth -= 1;
+
+    if (periodMonth < 0) {
+      periodMonth = 11;
+      periodYear -= 1;
+    }
+  }
+
+  const start = new Date(
+    periodYear,
+    periodMonth,
+    budgetMonthStartDay,
+    12,
+    0,
+    0
+  );
+
+  /*
+   * Le jour de fin est la veille du premier jour de la
+   * période suivante.
+   */
+  const end = new Date(
+    periodYear,
+    periodMonth + 1,
+    budgetMonthStartDay - 1,
+    12,
+    0,
+    0
+  );
+
+  const key =
+    `${start.getFullYear()}-` +
+    `${String(start.getMonth() + 1).padStart(2, "0")}`;
+
+  return {
+    start,
+    end,
+    key,
+    year: start.getFullYear(),
+    monthIndex: start.getMonth()
+  };
+}
+
+function isDateInsideBudgetPeriod(dateString, period) {
+  const date = parseDate(dateString);
+
+  return date >= period.start && date <= period.end;
+}
+
+function formatBudgetPeriod(period) {
+  const formatter = new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+
+  return (
+    `Du ${formatter.format(period.start)} ` +
+    `au ${formatter.format(period.end)}`
+  );
+}
+
+function updateBudgetPeriodPreview() {
+  const preview =
+    document.getElementById("budgetPeriodPreview");
+
+  if (!preview) {
+    return;
+  }
+
+  const currentPeriod = getBudgetPeriod(new Date());
+
+  preview.textContent =
+    `Période actuelle : ${formatBudgetPeriod(currentPeriod)}`;
+}
 
     function showToast(message) {
       const toast = document.getElementById("toast");
@@ -2061,6 +2234,26 @@
 
     async function openAuthenticatedApplication(user) {
       currentUser = user;
+
+      const savedStartDay = Number(
+  user.user_metadata?.budget_month_start_day
+);
+
+budgetMonthStartDay =
+  Number.isInteger(savedStartDay) &&
+  savedStartDay >= 1 &&
+  savedStartDay <= 28
+    ? savedStartDay
+    : 1;
+
+const budgetMonthSelect =
+  document.getElementById("budgetMonthStartDay");
+
+if (budgetMonthSelect) {
+  budgetMonthSelect.value = String(budgetMonthStartDay);
+}
+
+updateBudgetPeriodPreview();
 
       document.getElementById("accountEmail").textContent =
         user.email || "Compte connecté";
@@ -2578,7 +2771,7 @@
     }
 
     function renderDashboard() {
-      const currentMonth = toISODate(new Date()).slice(0, 7);
+      const currentPeriod = getBudgetPeriod(new Date());
 
       const totalIncome = state.transactions
         .filter(item => item.type === "income")
@@ -2589,7 +2782,10 @@
         .reduce((sum, item) => sum + Number(item.amount), 0);
 
       const monthTransactions = state.transactions.filter(item => {
-        return String(item.transaction_date).slice(0, 7) === currentMonth;
+        return isDateInsideBudgetPeriod(
+          item.transaction_date,
+          currentPeriod
+        );
       });
 
       const monthlyIncome = monthTransactions
@@ -2610,10 +2806,7 @@
         formatCurrency(monthlyExpense);
 
       document.getElementById("monthCaption").textContent =
-        new Intl.DateTimeFormat("fr-FR", {
-          month: "long",
-          year: "numeric"
-        }).format(new Date());
+        formatBudgetPeriod(currentPeriod);
 
       const recent = [...state.transactions]
         .sort(sortTransactions)
@@ -2638,10 +2831,13 @@
             typeFilter === "all" ||
             transaction.type === typeFilter;
 
-          const monthMatches =
-            !monthFilter ||
-            String(transaction.transaction_date).slice(0, 7) ===
-              monthFilter;
+          const mtransactionPeriod = getBudgetPeriod(
+  parseDate(transaction.transaction_date)
+);
+
+const monthMatches =
+  !monthFilter ||
+  transactionPeriod.key === monthFilter;
 
           return typeMatches && monthMatches;
         })
@@ -2811,6 +3007,7 @@
       renderRecurring();
       renderCategories();
       renderStatistics();
+      updateBudgetPeriodPreview();
 
       updateCategorySelect(
         "transactionCategory",
@@ -2890,12 +3087,12 @@
       const years = new Set([new Date().getFullYear(), statisticsYear]);
 
       state.transactions.forEach(transaction => {
-        const year = Number(
-          String(transaction.transaction_date).slice(0, 4)
+        const period = getBudgetPeriod(
+          parseDate(transaction.transaction_date)
         );
 
-        if (Number.isFinite(year)) {
-          years.add(year);
+        if (Number.isFinite(period.year)) {
+          years.add(period.year);
         }
       });
 
@@ -2916,11 +3113,11 @@
 
     function calculateStatistics() {
       const transactions = state.transactions.filter(transaction => {
-        return (
-          Number(
-            String(transaction.transaction_date).slice(0, 4)
-          ) === statisticsYear
-        );
+        const period = getBudgetPeriod(
+    parseDate(transaction.transaction_date)
+  );
+
+  return period.year === statisticsYear;
       });
 
       const monthlyIncome = Array(12).fill(0);
@@ -2931,10 +3128,10 @@
       const monthlyCategoryMap = new Map();
 
       transactions.forEach(transaction => {
-        const month =
-          Number(
-            String(transaction.transaction_date).slice(5, 7)
-          ) - 1;
+        const transactionPeriod = getBudgetPeriod(
+          parseDate(transaction.transaction_date)
+        );
+        const month = transactionPeriod.monthIndex;
 
         if (month < 0 || month > 11) {
           return;
@@ -3548,6 +3745,75 @@
         .join("");
     }
 
+    async function saveBudgetMonthStartDay(value) {
+  const selectedDay = Number(value);
+
+  if (
+    !Number.isInteger(selectedDay) ||
+    selectedDay < 1 ||
+    selectedDay > 28
+  ) {
+    showToast("Le jour sélectionné est invalide.");
+    return;
+  }
+
+  const previousValue = budgetMonthStartDay;
+
+  budgetMonthStartDay = selectedDay;
+  updateBudgetPeriodPreview();
+  setSyncStatus("Synchronisation…");
+
+  try {
+    const existingMetadata =
+      currentUser?.user_metadata || {};
+
+    const { data, error } =
+      await supabaseClient.auth.updateUser({
+        data: {
+          ...existingMetadata,
+          budget_month_start_day: selectedDay
+        }
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.user) {
+      currentUser = data.user;
+    }
+
+    /*
+     * Le filtre des opérations est repositionné sur la
+     * période budgétaire actuelle.
+     */
+    const currentPeriod = getBudgetPeriod(new Date());
+
+    document.getElementById(
+      "transactionMonthFilter"
+    ).value = currentPeriod.key;
+
+    renderAll();
+    setSyncStatus("Synchronisé");
+
+    showToast(
+      `Le mois budgétaire commence maintenant le ${selectedDay}.`
+    );
+  } catch (error) {
+    console.error(error);
+
+    budgetMonthStartDay = previousValue;
+
+    document.getElementById(
+      "budgetMonthStartDay"
+    ).value = String(previousValue);
+
+    updateBudgetPeriodPreview();
+    setSyncStatus("Erreur de synchronisation");
+    showToast(normalizeError(error));
+  }
+}
+
     /*
      * ============================================================
      * AJOUT DES DONNÉES
@@ -3986,6 +4252,12 @@
         renderStatistics();
       });
 
+    document
+  .getElementById("budgetMonthStartDay")
+  .addEventListener("change", event => {
+    saveBudgetMonthStartDay(event.target.value);
+  });
+
     document.addEventListener("click", event => {
       const transactionButton =
         event.target.closest("[data-delete-transaction]");
@@ -4076,7 +4348,7 @@
       toISODate(new Date());
 
     document.getElementById("transactionMonthFilter").value =
-      toISODate(new Date()).slice(0, 7);
+      getBudgetPeriod(new Date()).key;
 
     initializeApplication();
   </script>
