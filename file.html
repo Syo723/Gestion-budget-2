@@ -1862,8 +1862,8 @@
       return Boolean(
         SUPABASE_URL &&
         SUPABASE_PUBLIC_KEY &&
-        !SUPABASE_URL.startsWith("https://") &&
-        !SUPABASE_PUBLIC_KEY.length >20
+        SUPABASE_URL.startsWith("https://") &&
+        SUPABASE_PUBLIC_KEY.length >20
       );
     }
 
